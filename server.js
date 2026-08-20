@@ -10,14 +10,16 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Resolve API key once at startup
 const EXPECTED_API_KEY = process.env.API_KEY || 'local-development-key';
+const API_AUTH_REQUIRED = process.env.API_AUTH_REQUIRED !== 'false';
 const USING_FALLBACK_KEY = !process.env.API_KEY;
 
-// API Key Middleware
 app.use((req, res, next) => {
-    // Exclude health check from API key requirement
     if (req.path === '/health') return next();
+
+    if (!API_AUTH_REQUIRED) {
+        return next();
+    }
 
     const apiKey = req.headers['x-api-key'];
 
@@ -66,7 +68,12 @@ function maskKey(key) {
 }
 
 // Startup diagnostics
-if (USING_FALLBACK_KEY) {
+if (!API_AUTH_REQUIRED) {
+    console.warn('[SECURITY WARNING] ============================================');
+    console.warn('[SECURITY WARNING] API AUTHENTICATION IS DISABLED (API_AUTH_REQUIRED=false)');
+    console.warn('[SECURITY WARNING] Anyone on the internet can access /api routes without a key!');
+    console.warn('[SECURITY WARNING] ============================================');
+} else if (USING_FALLBACK_KEY) {
     const isProd = process.env.NODE_ENV === 'production';
     if (isProd) {
         console.warn('[SECURITY WARNING] ============================================');
@@ -84,7 +91,9 @@ if (USING_FALLBACK_KEY) {
 app.listen(PORT, () => {
     console.log(`WhatsApp API Server running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    if (USING_FALLBACK_KEY) {
+    if (!API_AUTH_REQUIRED) {
+        console.log('[Auth] API_KEY authentication is OFF — all /api routes are open to everyone.');
+    } else if (USING_FALLBACK_KEY) {
         console.log('Reminder: All /api routes require header: x-api-key: local-development-key');
     }
 });

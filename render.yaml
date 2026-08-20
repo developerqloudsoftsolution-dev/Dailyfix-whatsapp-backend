@@ -17,6 +17,8 @@ services:
         value: info
       - key: AUTH_DIR
         value: /app/auth_info
+      - key: API_AUTH_REQUIRED
+        value: 'false'
       - key: WEBHOOK_URL
         sync: false
       - key: WEBHOOK_SECRET
