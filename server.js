@@ -16,7 +16,8 @@ app.use((req, res, next) => {
     if (req.path === '/health') return next();
 
     const apiKey = req.headers['x-api-key'];
-    if (apiKey !== process.env.API_KEY) {
+    const expectedKey = process.env.API_KEY || 'local-development-key';
+    if (apiKey !== expectedKey) {
         return res.status(401).json({ success: false, message: 'Unauthorized: Invalid API Key' });
     }
     next();
