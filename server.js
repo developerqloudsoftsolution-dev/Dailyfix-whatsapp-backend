@@ -10,15 +10,29 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Resolve API key once at startup
+const EXPECTED_API_KEY = process.env.API_KEY || 'local-development-key';
+const USING_FALLBACK_KEY = !process.env.API_KEY;
+
 // API Key Middleware
 app.use((req, res, next) => {
     // Exclude health check from API key requirement
     if (req.path === '/health') return next();
 
     const apiKey = req.headers['x-api-key'];
-    const expectedKey = process.env.API_KEY || 'local-development-key';
-    if (apiKey !== expectedKey) {
-        return res.status(401).json({ success: false, message: 'Unauthorized: Invalid API Key' });
+
+    if (!apiKey) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized: Missing API Key. Send the x-api-key header with your requests.'
+        });
+    }
+
+    if (apiKey !== EXPECTED_API_KEY) {
+        return res.status(401).json({
+            success: false,
+            message: 'Unauthorized: Invalid API Key. The x-api-key header value does not match the server configured API_KEY.'
+        });
     }
     next();
 });
@@ -45,6 +59,32 @@ whatsappService.connect().catch((err) => {
     console.warn('[WhatsApp API Server] Initial connection notice:', err.message);
 });
 
+// Mask API key for safe logging: show only first 3 and last 3 chars
+function maskKey(key) {
+    if (!key || key.length <= 6) return '***';
+    return key.substring(0, 3) + '...' + key.substring(key.length - 3);
+}
+
+// Startup diagnostics
+if (USING_FALLBACK_KEY) {
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd) {
+        console.warn('[SECURITY WARNING] ============================================');
+        console.warn('[SECURITY WARNING] API_KEY environment variable is NOT SET!');
+        console.warn('[SECURITY WARNING] Using insecure fallback key: "local-development-key"');
+        console.warn('[SECURITY WARNING] Set API_KEY in Render Dashboard -> Environment -> Environment Variables');
+        console.warn('[SECURITY WARNING] ============================================');
+    } else {
+        console.log('[Dev] API_KEY not set, using fallback local-development-key');
+    }
+} else {
+    console.log(`[Config] API_KEY configured: ${maskKey(EXPECTED_API_KEY)} (${EXPECTED_API_KEY.length} chars)`);
+}
+
 app.listen(PORT, () => {
     console.log(`WhatsApp API Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    if (USING_FALLBACK_KEY) {
+        console.log('Reminder: All /api routes require header: x-api-key: local-development-key');
+    }
 });
